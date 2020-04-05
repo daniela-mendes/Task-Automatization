@@ -5,118 +5,125 @@ import sys
 ### A: AGENT BEHAVIOR ###
 #########################
 
-def average(task):
-    if len(task) == 1: #only speculative utility
-        return task[0][1]
-    else:
-        average = 0
-        for utility in task:
-            if utility[0] != 0:
-                average += int(utility[1])
-        return (average/(len(task)-1))
-
+def average(task, memoryFactor):
+	if len(task) == 1: #only speculative utility
+		return task[0][1]
+	else:
+		num = 0.0
+		denom = 0.0
+		for i in range(1, len(task)):
+			num += (float(task[i][1]) * (task[i][0]**memoryFactor))
+			denom += task[i][0]**memoryFactor
+		return round(num/denom,4)
 
 
 class Agent:
-    def __init__(self, options):
-    	if len(options) == 4: #autonomous agent
-	        self.cycle = (options[0].split('='))[1]
-	        self.decision = (options[1].split('='))[1]
-	        self.restart = (options[2].split('='))[1]
-	        self.memoryFactor = (options[3].split('='))[1]
+	def __init__(self, options):
+		self.restart = 0
+		if len(options) == 4: #autonomous agent
+			self.cycle = int((options[0].split('='))[1])
+			self.decision = (options[1].split('='))[1]
+			self.restart = int((options[2].split('='))[1])
+			self.memoryFactor = float((options[3].split('='))[1])
 
-	        global cycles_left
-	        cycles_left = int(self.cycle)
+		#else: #len(options) = 6 because multi-agent system
+		#	self.cycle = (options[0].split('='))[1]
+		#	self.agents = (options[1].split('='))[1]
+		#    self.decision = (options[2].split('='))[1]
+		#    self.restart = (options[3].split('='))[1]
+		#    self.memoryFactor = (options[4].split('='))[1]
+		#    self.concurrencyPenalty = (options[5].split('='))[1]
 
-	    #else: #len(options) = 6 because multi-agent system
-	    #	self.cycle = (options[0].split('='))[1]
-	    #	self.agents = (options[1].split('='))[1]
-	    #    self.decision = (options[2].split('='))[1]
-	    #    self.restart = (options[3].split('='))[1]
-	    #    self.memoryFactor = (options[4].split('='))[1]
-	    #    self.concurrencyPenalty = (options[5].split('='))[1]
-
-
-    def perceive(self, input): # is it 'A' or 'Tx u=y'
-        global restart_time, task_to_perform, gain, decide_task, cycles_left
-        if input[0] == 'A':
-            gain += float((input.strip().split('='))[1]) #strip() removes newline character at the end of the string
-            state[task_to_perform[0]] += ((int(self.cycle)-cycles_left,(input.strip().split('='))[1]),)
-            decide_task = 1 #after an update, he has to check which task to go for now (MIGHT BE PROBLEMATIC DONT FORGET THISSS)
-        else: #input[0] = 'T'
-            decide_task = 1
-            state[(input.strip().split(' '))[0]] = ((0,(input.strip().split('='))[1]),)
-            restart_time[(input.strip().split(' '))[0]] = int(self.restart)
+		self.cycles_left = self.cycle
+		self.decide_task = 0 # 0 when no new task; 1 when new/need-update task and goes back to zero after knowing which task to perform
+		self.restart_time = self.restart
+		self.task_to_perform = () #for perceive(self, input)
+		self.gain = 0 #gain = gains for each task of each agent
+		self.state = {} #state = tasks and utilities of the agent
 
 
-    def decide_act(self): #which task shold the agent perform
-    	global task_to_perform, restart_time, decide_task, cycles_left
-    	previous_task = task_to_perform
-
-    	if decide_task == 1:
-    		#if cycles_left >= (int(self.restart) + 1): #in this case, since I have enough steps/cycles left, I have to look into the tasks' utilities
-    		task_to_perform = ('T0',state['T0'])
-    		#print(task_to_perform)
-    		for task in state.items():
-    			#if task[0] == 'T0':
-    				#task_to_perform = task
-    			#else:
-    			if task[0] != 'T0':
-    				if (float(average(task[1]))*(cycles_left-restart_time[task[0]])) - (float(average(task_to_perform[1]))*(cycles_left-restart_time[task_to_perform[0]])) > 0: #compares utilities
-    					task_to_perform = task
-
-    		decide_task = 0
-
-    	if previous_task == task_to_perform:
-    		if restart_time[task_to_perform[0]] > 0:
-    			restart_time[task_to_perform[0]] -=1
-    	else:
-    		if len(previous_task) > 0:
-    			restart_time[previous_task[0]] = int(self.restart)
-    		restart_time[task_to_perform] = int(self.restart) - 1
-    	
-    	cycles_left -= 1
+	def perceive(self, input): # is it 'A' or 'Tx u=y'
+		if input[0] == 'A':
+			self.gain += float((input.strip().split('='))[1]) #strip() removes newline character at the end of the string
+			self.state[self.task_to_perform[0]] += ((self.cycle-self.cycles_left,(input.strip().split('='))[1]),)
+			#print(self.state)
+			#self.decide_task = 1 #after an update, he has to check which task to go for now (MIGHT BE PROBLEMATIC DONT FORGET THISSS)
+		else: #input[0] = 'T'
+			#self.decide_task = 1
+			self.state[(input.strip().split(' '))[0]] = ((0,(input.strip().split('='))[1]),)
+			#print(self.state)
 
 
-    def recharge(self):
-    	num = 0
-    	denom = 0
-    	output = "{"
-    	for task in state.items():
-    		if len(task[1]) > 1: #len = 1 means that that task was never executed (only has 1 tuple, which corresponds to the speculative utility)
-    			for i in range(1, len(task[1])):
-    				num += (float(task[1][i][1]) * (task[1][i][0]**float(self.memoryFactor)))
-    				denom += task[1][i][0]**float(self.memoryFactor)
-    			output += task[0] + '=' + ("{:.2f}".format(num/denom))
-    			num = 0
-    			denom = 0
-    		else:
-    			output += task[0] + '=NA'
+	def decide_act(self): #which task shold the agent perform
+		if len(self.task_to_perform) > 0:
+			previous_task = (self.task_to_perform[0],self.state[self.task_to_perform[0]])
+		else:
+			previous_task = ()
+		#print(previous_task)
+		#if self.decide_task == 1:
+		if self.cycles_left >= self.restart: #in this case, since I have enough steps/cycles left, I have to look into the tasks' utilities
+			self.task_to_perform = ('T0',self.state['T0'])
+			#print(self.task_to_perform)
+			for task in self.state.items(): # para ver a melhor task
+				if task[0] != 'T0':
+					if (float(average(task[1], self.memoryFactor)) > float(average(self.task_to_perform[1], self.memoryFactor))):
+					#if (float(average(task[1]))*(self.cycles_left-self.restart_time[task[0]])) - (float(average(self.task_to_perform[1]))*(self.cycles_left-self.restart_time[self.task_to_perform[0]])) > 0: #compares utilities
+						self.task_to_perform = task
+		#print(self.task_to_perform[0])
+		#print(float(average(self.task_to_perform[1], self.memoryFactor)))
+		#print(self.cycles_left, self.restart)
+		if self.restart == 0:
+			self.cycles_left -= 1
+			return
 
-    		if list(state.keys())[-1] != task[0]:
-    			output += ','
+		expected_to_perform = float(average(self.task_to_perform[1], self.memoryFactor))*(self.cycles_left-self.restart)
+		if len(previous_task) > 0:
+			expected_previous = float(average(previous_task[1], self.memoryFactor))*(self.cycles_left-self.restart_time)
+		else:
+			expected_previous = float('-inf')
 
-    	output += "} "
+		#print(self.task_to_perform[0], float(average(self.task_to_perform[1], self.memoryFactor)), expected_to_perform)
+		#if len(previous_task) > 0:
+			#print(previous_task[0], float(average(previous_task[1], self.memoryFactor)), expected_previous)
+		#print('\n')
+		#self.decide_task = 0
 
-    	return ("state=" + output + "gain=" + str(("{:.2f}".format(gain))))
+		if (expected_previous > expected_to_perform) or (expected_previous == expected_to_perform and int(previous_task[0][1:]) <= int(self.task_to_perform[0][1:])):
+			self.task_to_perform = previous_task
+			if self.restart_time != 0:
+				self.restart_time -=1
+		else:
+			self.restart_time = self.restart - 1
+		
+		self.cycles_left -= 1
+
+
+	def recharge(self):
+		output = "{"
+		for task in self.state.items():
+			if len(task[1]) > 1: #len = 1 means that that task was never executed (only has 1 tuple, which corresponds to the speculative utility)
+				output += task[0] + '=' + ("{:.2f}".format(float(average(task[1], self.memoryFactor))))
+			else:
+				output += task[0] + '=NA'
+
+			if list(self.state.keys())[-1] != task[0]:
+				output += ','
+
+		output += "} "
+
+		return ("state=" + output + "gain=" + str(("{:.2f}".format(self.gain))))
 
 
 #####################
 ### B: MAIN UTILS ###
 #####################
-decide_task = 0 # 0 when no new task; 1 when new/need-update task and goes back to zero after knowing which task to perform
-restart_time = {}
-cycles_left = 0 #number of cycles left for the algorith to end (useful to understand if it is worth pursuing a different task)
-task_to_perform = () #for perceive(self, input)
-gain = 0 #gain = gains for each task of each agent
-state = {} #state = tasks and utilities of the agent
 
 line = sys.stdin.readline()
 agent = Agent(line.split(' ')) #line = list with every 'word'/character separated
 for line in sys.stdin:
-    if line.startswith("end"): break
-    elif line.startswith("TIK"): agent.decide_act()
-    else: agent.perceive(line)
+	if line.startswith("end"): break
+	elif line.startswith("TIK"): agent.decide_act()
+	else: agent.perceive(line)
 sys.stdout.write(agent.recharge()+'\n');
 
 
