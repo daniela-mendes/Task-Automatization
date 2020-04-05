@@ -13,7 +13,6 @@ def average(task):
         for utility in task:
             if utility[0] != 0:
                 average += int(utility[1])
-        print(average/(len(task)-1))
         return (average/(len(task)-1))
 
 
@@ -41,28 +40,40 @@ class Agent:
     def perceive(self, input): # is it 'A' or 'Tx u=y'
         global restart_time, task_to_perform, gain, decide_task, cycles_left
         if input[0] == 'A':
-            gain += int((input.strip().split('='))[1]) #strip() removes newline character at the end of the string
+            gain += float((input.strip().split('='))[1]) #strip() removes newline character at the end of the string
             state[task_to_perform[0]] += ((int(self.cycle)-cycles_left,(input.strip().split('='))[1]),)
             decide_task = 1 #after an update, he has to check which task to go for now (MIGHT BE PROBLEMATIC DONT FORGET THISSS)
         else: #input[0] = 'T'
             decide_task = 1
             state[(input.strip().split(' '))[0]] = ((0,(input.strip().split('='))[1]),)
+            restart_time[(input.strip().split(' '))[0]] = int(self.restart)
 
 
     def decide_act(self): #which task shold the agent perform
     	global task_to_perform, restart_time, decide_task, cycles_left
+    	previous_task = task_to_perform
 
     	if decide_task == 1:
-    		previous_task = task_to_perform
-    		if cycles_left >= (int(self.restart) + 1): #in this case, since I have enough steps/cycles left, I have to look into the tasks' utilities
-    			for task in state.items():
-    				if task[0] == 'T0':
+    		#if cycles_left >= (int(self.restart) + 1): #in this case, since I have enough steps/cycles left, I have to look into the tasks' utilities
+    		task_to_perform = ('T0',state['T0'])
+    		#print(task_to_perform)
+    		for task in state.items():
+    			#if task[0] == 'T0':
+    				#task_to_perform = task
+    			#else:
+    			if task[0] != 'T0':
+    				if (float(average(task[1]))*(cycles_left-restart_time[task[0]])) - (float(average(task_to_perform[1]))*(cycles_left-restart_time[task_to_perform[0]])) > 0: #compares utilities
     					task_to_perform = task
-    				else:
-    					if (float(average(task[1])) - float(average(task_to_perform[1]))) > 0: #compares utilities
-    						task_to_perform = task
 
     		decide_task = 0
+
+    	if previous_task == task_to_perform:
+    		if restart_time[task_to_perform[0]] > 0:
+    			restart_time[task_to_perform[0]] -=1
+    	else:
+    		if len(previous_task) > 0:
+    			restart_time[previous_task[0]] = int(self.restart)
+    		restart_time[task_to_perform] = int(self.restart) - 1
     	
     	cycles_left -= 1
 
@@ -76,7 +87,7 @@ class Agent:
     			for i in range(1, len(task[1])):
     				num += (float(task[1][i][1]) * (task[1][i][0]**float(self.memoryFactor)))
     				denom += task[1][i][0]**float(self.memoryFactor)
-    			output += task[0] + '=' + str(num/denom)
+    			output += task[0] + '=' + ("{:.2f}".format(num/denom))
     			num = 0
     			denom = 0
     		else:
@@ -87,18 +98,18 @@ class Agent:
 
     	output += "} "
 
-    	return ("state=" + output + "gain=" + str(gain) + '.00')
+    	return ("state=" + output + "gain=" + str(("{:.2f}".format(gain))))
 
 
 #####################
 ### B: MAIN UTILS ###
 #####################
 decide_task = 0 # 0 when no new task; 1 when new/need-update task and goes back to zero after knowing which task to perform
-restart_time = 0 
+restart_time = {}
 cycles_left = 0 #number of cycles left for the algorith to end (useful to understand if it is worth pursuing a different task)
 task_to_perform = () #for perceive(self, input)
 gain = 0 #gain = gains for each task of each agent
-state = {} #state = tasks and (expected) utilities of the agent
+state = {} #state = tasks and utilities of the agent
 
 line = sys.stdin.readline()
 agent = Agent(line.split(' ')) #line = list with every 'word'/character separated
