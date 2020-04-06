@@ -43,11 +43,22 @@ class Agent:
 
 
 	def perceive(self, input): # is it 'A' or 'Tx u=y'
-		if input[0] == 'A':
-			self.gain += float((input.strip().split('='))[1]) #strip() removes newline character at the end of the string
-			self.state[self.task_to_perform[0]] += ((self.cycle-self.cycles_left,(input.strip().split('='))[1]),)
-		else: #input[0] = 'T'
-			self.state[(input.strip().split(' '))[0]] = ((0,(input.strip().split('='))[1]),)
+		if self.decision == 'rationale' or self.decision == 'homogeneous-society':
+			if input[0] == 'A':
+				self.gain += float((input.strip().split('='))[1]) #strip() removes newline character at the end of the string
+				self.state[self.task_to_perform[0]] += ((self.cycle-self.cycles_left,(input.strip().split('='))[1]),)
+			else: #input[0] = 'T'
+				self.state[(input.strip().split(' '))[0]] = ((0,(input.strip().split('='))[1]),)
+
+		elif self.decision == 'heterogeneous-society':
+			if input[0] == 'A':
+				#self.gain += float((input.strip().split('='))[1]) #strip() removes newline character at the end of the string
+				#self.state[self.task_to_perform[0]][input.strip().split(' ')[0][1:]-1] += ((self.cycle-self.cycles_left,(input.strip().split('='))[1]),)
+				
+			else: #input[0] = 'T'
+				self.state[(input.strip().split(' '))[0]] = ()
+				for i in range(len(self.agents)): #speculative utilities of tasks are the same for all agents
+					self.state[(input.strip().split(' '))[0]] += ((0,(input.strip().split('='))[1]),),
 
 
 	def decide_act(self): #which task shold the agent perform
