@@ -43,22 +43,11 @@ class Agent:
 
 
 	def perceive(self, input): # is it 'A' or 'Tx u=y'
-		if self.decision == 'rationale' or self.decision == 'homogeneous-society':
-			if input[0] == 'A':
-				self.gain += float((input.strip().split('='))[1]) #strip() removes newline character at the end of the string
-				self.state[self.task_to_perform[0]] += ((self.cycle-self.cycles_left,(input.strip().split('='))[1]),)
-			else: #input[0] = 'T'
-				self.state[(input.strip().split(' '))[0]] = ((0,(input.strip().split('='))[1]),)
-
-		elif self.decision == 'heterogeneous-society':
-			if input[0] == 'A':
-				#self.gain += float((input.strip().split('='))[1]) #strip() removes newline character at the end of the string
-				#self.state[self.task_to_perform[0]][input.strip().split(' ')[0][1:]-1] += ((self.cycle-self.cycles_left,(input.strip().split('='))[1]),)
-				
-			else: #input[0] = 'T'
-				self.state[(input.strip().split(' '))[0]] = ()
-				for i in range(len(self.agents)): #speculative utilities of tasks are the same for all agents
-					self.state[(input.strip().split(' '))[0]] += ((0,(input.strip().split('='))[1]),),
+		if input[0] == 'A':
+			self.gain += float((input.strip().split('='))[1]) #strip() removes newline character at the end of the string
+			self.state[self.task_to_perform[0]] += ((self.cycle-self.cycles_left,(input.strip().split('='))[1]),)
+		else: #input[0] = 'T'
+			self.state[(input.strip().split(' '))[0]] = ((0,(input.strip().split('='))[1]),)
 
 
 	def decide_act(self): #which task shold the agent perform
@@ -95,8 +84,9 @@ class Agent:
 
 
 	def recharge(self):
-		output = "{"
+		global agentPos, heteroGain
 		if self.decision == 'rationale':
+			output = "{"
 			for task in self.state.items():
 				if len(task[1]) > 1: #len = 1 means that that task was never executed (only has 1 tuple, which corresponds to the speculative utility)
 					output += task[0] + '=' + ("{:.2f}".format(float(average(task[1], self.memoryFactor))))
@@ -105,8 +95,13 @@ class Agent:
 
 				if list(self.state.keys())[-1] != task[0]:
 					output += ','
+			
+			output += "} "
+
+			return ("state=" + output + "gain=" + str(("{:.2f}".format(self.gain))))
 
 		elif self.decision == 'homogeneous-society':
+			output = "{"
 			for i in range(len(self.agents)):
 				output += 'A' + str(i+1) + '={'
 				for task in self.state.items():
@@ -122,22 +117,81 @@ class Agent:
 				if i != len(self.agents)-1:
 					output += ','
 
-		output += "} "
+			output += "} "
 
-		return ("state=" + output + "gain=" + str(("{:.2f}".format(self.gain))))
+			return ("state=" + output + "gain=" + str(("{:.2f}".format(self.gain))))
+
+		elif self.decision == 'heterogeneous-society':
+			if agentPos == 0:
+				output = 'state={'
+				output += self.agents[agentPos] + '={'
+			else:
+				output = self.agents[agentPos] + '={' 
+				
+			for task in self.state.items():
+				if len(task[1]) > 1: #len = 1 means that that task was never executed (only has 1 tuple, which corresponds to the speculative utility)
+					output += task[0] + '=' + ("{:.2f}".format(float(average(task[1], self.memoryFactor))))
+				else:
+					output += task[0] + '=NA'
+
+				if list(self.state.keys())[-1] != task[0]:
+					output += ','
+
+			output += '}'
+
+			heteroGain += self.gain
+			
+			if agentPos != len(self.agents)-1:
+					output += ','
+					agentPos += 1
+					return (output)
+
+			else:
+				output += "} "
+				return (output + "gain=" + str(("{:.2f}".format(heteroGain))))
+
+
+		
 
 
 #####################
 ### B: MAIN UTILS ###
 #####################
 
+agentPos = 0 #agent position for heterogeneous society recharge
+heteroGain = 0 
+
 line = sys.stdin.readline()
-agent = Agent(line.split(' ')) #line = list with every 'word'/character separated
-for line in sys.stdin:
-	if line.startswith("end"): break
-	elif line.startswith("TIK"): agent.decide_act()
-	else: agent.perceive(line)
-sys.stdout.write(agent.recharge()+'\n');
+if (len(line.split(' ')) == 4) or ((len(line.split(' ')) == 6) and (line.split(' ')[2].split('=')[1] == 'homogeneous-society')):
+	agent = Agent(line.split(' '))
+	for line in sys.stdin:
+		if line.startswith("end"): break
+		elif line.startswith("TIK"): agent.decide_act()
+		else: agent.perceive(line)
+	sys.stdout.write(agent.recharge()+'\n');
+
+else:
+	agents = list()
+	for i in range(len(line.split(' ')[1].split('=')[1][1:-1].split(','))): #number of agents
+		agents.append(Agent(line.split(' '))) #line = list with every 'word'/character separated
+
+	for line in sys.stdin:
+		if line.startswith("end"): break
+		elif line.startswith("TIK"): 
+			for agent in agents:
+				agent.decide_act()
+		else: 
+			if line.startswith("T"):
+				for agent in agents:
+					agent.perceive(line)
+			else:
+				agents[int(line.split(' ')[0][1:])-1].perceive(line)
+
+	for agent in agents:
+		if agent != agents[-1]:
+			sys.stdout.write(agent.recharge());
+		else:
+			sys.stdout.write(agent.recharge()+'\n');
 
 
 
