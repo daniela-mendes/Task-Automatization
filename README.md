@@ -1,6 +1,6 @@
 # Automatization: Single Agents, homogeneous and heterogeneous societies (AASMA 2019/2020)
 
-## Topics covered
+### Topics covered
 * Autonomous Agents
     * Rationale agents
     * Costs of exchanging tasks
@@ -9,6 +9,7 @@
 
 * Multi-Agent Systems
     * Homogeneous and heterogeneous societies: cooperative society
+
 
 
 This project considers the problem of automatization, where agents can possess skills and resources that determine their ability to successfully accomplish specific tasks.
